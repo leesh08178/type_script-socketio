@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>웹소켓</title>
+    <style>
+        body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+        #div { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
+        #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
+        #input:focus { outline: none; }
+        #div > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
+
+        #messages > li { padding: 0.5rem 1rem; }
+        #messages > li:nth-child(odd) { background: #efefef; }
+    </style>
+
+</head>
+<body>
+<h1>웹소켓 테스트</h1>
+<div id="div">
+    <input id="input" autocomplete="off" />
+    <button id="btn_send">전송</button>
+    <button id="btn_close">연결 끊기</button>
+    <button id="btn_on" style="display: none">연결</button>
+</div>
+</body>
+<script src='/socket.io/socket.io.js'></script>
+<script src='https://code.jquery.com/jquery-1.11.1.js'></script>
+<script>
+    var socketId = null;
+    function connect() {
+        const socket = io.connect();
+        document.getElementById("btn_send").onclick = function () {
+            const message = document.getElementById("input").value;
+            socket.emit("message", message);
+            document.getElementById("input").value = '';
+        }
+
+        socket.on("message", (msg) => {
+            if (socketId == null) {
+                socketId = msg;
+                msg = 'socket id : ' + msg;
+            }
+            console.log(msg);
+        });
+    }
+
+    connect();
+</script>
+</html>
