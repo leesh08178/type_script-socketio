@@ -47,7 +47,7 @@
 <script>
     let service = [];
     let joinRoom = [];
-    const socket = io.connect('http://192.168.16.93:3000');
+    const socket = io.connect('http://192.168.16.93:3000', { transports: ["websocket"] });
     let id = null;
 
     socket.emit("ready");
