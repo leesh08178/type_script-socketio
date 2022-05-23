@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>웹소켓</title>
     <style>
-        body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { margin: 1rem; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 
-        #div { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
-        #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
-        #input:focus { outline: none; }
-        #div > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
+        #pushDiv { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
+        #messagesInput { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
+        #messagesInput:focus { outline: none; }
+        #pushDiv > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
 
         #messages > li { padding: 0.5rem 1rem; }
         #messages > li:nth-child(odd) { background: #efefef; }
@@ -19,34 +19,131 @@
 </head>
 <body>
 <h1>웹소켓 테스트</h1>
-<div id="div">
-    <input id="input" autocomplete="off" />
+<h3 id="socketName"></h3>
+<button id="refresh">새로고침</button>
+</br></br>
+<div>
+    <select id="service"></select>
+    </br></br>
+    <input id="serviceInput" autocomplete="off" >
+    <button id="serviceCreate">서비스 생성</button>
+    <button id="serviceRemove">서비스 삭제</button>
+</div>
+</br>
+<div>
+    <input id="roomInput" autocomplete="off" >
+    <button id="roomJoin">방 입장</button>
+</div>
+</br></br>
+<div id="roomDiv">
+</div>
+<div id="pushDiv">
+    <input id="messagesInput" autocomplete="off" />
     <button id="btn_send">전송</button>
-    <button id="btn_close">연결 끊기</button>
-    <button id="btn_on" style="display: none">연결</button>
 </div>
 </body>
 <script src='/socket.io/socket.io.js'></script>
 <script src='https://code.jquery.com/jquery-1.11.1.js'></script>
 <script>
-    var socketId = null;
-    function connect() {
-        const socket = io.connect();
-        document.getElementById("btn_send").onclick = function () {
-            const message = document.getElementById("input").value;
-            socket.emit("message", message);
-            document.getElementById("input").value = '';
+    let service = [];
+    let joinRoom = [];
+    const socket = io.connect('http://192.168.16.93:3000');
+    let id = null;
+
+    socket.emit("ready");
+    socket.emit("refresh");
+
+    socket.on("onReady", (setInfo) => {
+        id = setInfo.id;
+        $("#socketName").text(`${setInfo.id}`);
+    });
+
+    socket.on("onMessage", (msg) => {
+        console.log(msg);
+    });
+
+    socket.on("onCreateServiceClient", (serviceName) => {
+        service.push(serviceName);
+        const opt = `<option value=${serviceName}>${serviceName}</option>`;
+        $("#service").append(opt);
+    });
+
+    socket.on("onRemoveServiceClient", (serviceName) => {
+        const tempService = service.filter((tempService) => tempService != serviceName);
+        service = tempService;
+        $('#service > option[value='+ serviceName +']').remove();
+    });
+
+    socket.on("onRefreshClient", (refreshInfo) => {
+        joinRoom = [];
+        $("#roomDiv").empty();
+        for (const room of refreshInfo.rooms) {
+            let clients = refreshInfo.clientsByRoom.filter((client) => { return client.key == room });
+            if (clients.length > 0) {
+                clients = clients[0].clients;
+            }
+
+            const isJoin = clients.find((client) => { return client == id ? true : false });
+            const clientOpt = clients.join('</br>');
+            let opt = "<h3>" + room + " </h3>" + clientOpt + "</br>";
+            if(isJoin) {
+                joinRoom.push(room);
+                opt += "</br><button onclick=\"roomLeave('" + room + "')\">방 퇴장</button>"
+            }
+
+            $("#roomDiv").append(opt);
         }
 
-        socket.on("message", (msg) => {
-            if (socketId == null) {
-                socketId = msg;
-                msg = 'socket id : ' + msg;
-            }
-            console.log(msg);
-        });
+        console.log(refreshInfo.message);
+    });
+
+    function roomLeave(roomName) {
+        console.log('leave:'+roomName);
+        socket.emit("leaveRoom", roomName);
     }
 
-    connect();
+    document.getElementById('refresh').onclick = function () {
+        socket.emit("refresh");
+    }
+
+    document.getElementById('roomJoin').onclick = function () {
+        const roomName = document.getElementById('roomInput').value;
+        console.log('join:'+roomName);
+        socket.emit("joinRoom", roomName);
+        document.getElementById('roomInput').value = '';
+    }
+
+    document.getElementById("serviceCreate").onclick = function () {
+        const serviceName = document.getElementById("serviceInput").value;
+        socket.emit("createService", {
+            name: serviceName,
+            nsp: serviceName,
+            date: new Date()
+        });
+
+        document.getElementById("serviceInput").value = '';
+    }
+
+    document.getElementById("serviceRemove").onclick = function () {
+        const serviceName = document.getElementById("serviceInput").value;
+        socket.emit("removeService", {
+            name: serviceName,
+            nsp: serviceName,
+            date: new Date()
+        });
+
+        document.getElementById("serviceInput").value = '';
+    }
+
+    document.getElementById("btn_send").onclick = function () {
+        const message = document.getElementById("messagesInput").value;
+        socket.emit("messageSend", {
+            rooms: joinRoom,
+            text: message,
+            date: new Date()
+        });
+
+        document.getElementById("messagesInput").value = '';
+    }
 </script>
 </html>
